@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#10131d"><meta name="description" content="Link Inspector — проверка и анализ рекламных ссылок LootLabs и Platorepay.">
+<meta name="theme-color" content="#10131d"><meta name="description" content="Link Inspector — распознавание ссылок LootLabs и Platoboost / Platorelay.">
 <title>Link Inspector</title>
 <style>
 :root{color-scheme:dark;--bg:#0b0d14;--panel:#141824;--line:#292f40;--muted:#9ba5bb;--text:#f4f6ff;--accent:#8b7cff;--accent2:#5bcbda}
@@ -11,10 +11,10 @@
 </style></head>
 <body><main class="wrap">
 <header class="brand"><div class="logo">↗</div><div><strong>Link Inspector</strong><small>URL TOOLKIT</small></div></header>
-<section class="hero"><span class="pill">LOOTLABS · PLATOREPAY</span><h1>Разберись со своей ссылкой</h1><p>Проверь адрес, определи платформу и открой исходную ссылку. Без регистрации и без отправки URL на сторонний сервер.</p></section>
+<section class="hero"><span class="pill">LOOTLABS · PLATOBOOST / PLATORELAY</span><h1>Разберись со своей ссылкой</h1><p>Проверь адрес, определи платформу и открой исходную ссылку. Без регистрации и без отправки URL на сторонний сервер.</p></section>
 <section class="card"><label class="label" for="url">Вставь ссылку</label><div class="inputrow"><input id="url" type="url" inputmode="url" placeholder="https://example.com/..." autocomplete="url"><button id="check">Проверить</button></div><p class="hint">Проверка выполняется локально в браузере. Не вставляй ссылки, содержащие личные токены.</p>
 <div id="result" class="result" aria-live="polite"></div>
-<div class="platforms"><div class="platform"><b>LootLabs</b><span>Определение домена и формата URL</span></div><div class="platform"><b>Platorepay</b><span>Определение домена и формата URL</span></div></div>
+<div class="platforms"><div class="platform"><b>LootLabs</b><span>Определение домена и формата URL</span></div><div class="platform"><b>Platoboost / Platorelay</b><span>Распознавание auth.platorelay.com</span></div></div>
 <div class="notice">Важно: GitHub Pages — статический хостинг. Эта страница не обходит рекламные задания и не извлекает защищённые конечные ссылки. Для серверной интеграции нужен разрешённый API платформы.</div></section>
 <section class="features"><div class="feature"><b>Локальная проверка</b><span>Введённый URL не отправляется нам.</span></div><div class="feature"><b>Распознавание домена</b><span>Показывает, к какой платформе относится ссылка.</span></div><div class="feature"><b>Быстрый переход</b><span>Можно открыть исходную ссылку отдельно.</span></div></section>
 <footer>Link Inspector · GitHub Pages · Неофициальный инструмент</footer></main>
@@ -26,8 +26,8 @@ if(!['https:','http:'].includes(u.protocol)){result.innerHTML='<strong>Непо�
 if(u.username||u.password){result.innerHTML='<strong>Ссылка отклонена</strong><p>URL содержит данные для входа. Удали их перед проверкой.</p>';return}
 const host=u.hostname.toLowerCase().replace(/\.$/,'');
 const isLoot=host==='lootlabs.gg'||host.endsWith('.lootlabs.gg');
-const isPlato=host==='platorepay.com'||host.endsWith('.platorepay.com');
-let type=isLoot?'LootLabs':isPlato?'Platorepay':'Неизвестная платформа';
+const isPlato=host==='platorepay.com'||host.endsWith('.platorepay.com')||host==='platorelay.com'||host.endsWith('.platorelay.com')||host==='platoboost.app'||host.endsWith('.platoboost.app');
+let type=isLoot?'LootLabs':isPlato?'Platoboost / Platorelay':'Неизвестная платформа';
 let note=(isLoot||isPlato)?'Домен распознан. Эта проверка не подтверждает безопасность ссылки и не обходит рекламные шаги.':'Домен не совпал с известными доменами LootLabs или Platorepay.';
 result.replaceChildren();const title=document.createElement('strong');title.textContent=type;const p=document.createElement('p');p.textContent=note+'\nДомен: '+host;const actions=document.createElement('div');actions.className='actions';const open=document.createElement('a');open.href=u.href;open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть исходную ссылку';const copy=document.createElement('button');copy.type='button';copy.textContent='Копировать URL';copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u.href);copy.textContent='Скопировано'}catch{copy.textContent='Не удалось скопировать'}});actions.append(open,copy);result.append(title,p,actions)}
 document.querySelector('#check').addEventListener('click',inspect);input.addEventListener('keydown',e=>{if(e.key==='Enter')inspect()});
