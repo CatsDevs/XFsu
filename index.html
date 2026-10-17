@@ -11,24 +11,58 @@
 </style></head>
 <body><main class="wrap">
 <header class="brand"><div class="logo">↗</div><div><strong>Link Inspector</strong><small>URL TOOLKIT</small></div></header>
-<section class="hero"><span class="pill">LOOTLABS · PLATOBOOST / PLATORELAY</span><h1>Разберись со своей ссылкой</h1><p>Проверь адрес, определи платформу и открой исходную ссылку. Без регистрации и без отправки URL на сторонний сервер.</p></section>
+<section class="hero"><span class="pill">LOOTLABS · PLATOBOOST / PLATORELAY</span><h1>Разберись со своей ссылкой</h1><p>Анализируй URL, находи открытые ссылки внутри параметров перенаправления и проверяй цепочку вручную.</p></section>
 <section class="card"><label class="label" for="url">Вставь ссылку</label><div class="inputrow"><input id="url" type="url" inputmode="url" placeholder="https://example.com/..." autocomplete="url"><button id="check">Проверить</button></div><p class="hint">Проверка выполняется локально в браузере. Не вставляй ссылки, содержащие личные токены.</p>
 <div id="result" class="result" aria-live="polite"></div>
 <div class="platforms"><div class="platform"><b>LootLabs</b><span>Определение домена и формата URL</span></div><div class="platform"><b>Platoboost / Platorelay</b><span>Распознавание auth.platorelay.com</span></div></div>
-<div class="notice">Важно: GitHub Pages — статический хостинг. Эта страница не обходит рекламные задания и не извлекает защищённые конечные ссылки. Для серверной интеграции нужен разрешённый API платформы.</div></section>
-<section class="features"><div class="feature"><b>Локальная проверка</b><span>Введённый URL не отправляется нам.</span></div><div class="feature"><b>Распознавание домена</b><span>Показывает, к какой платформе относится ссылка.</span></div><div class="feature"><b>Быстрый переход</b><span>Можно открыть исходную ссылку отдельно.</span></div></section>
+<div class="notice">Ограничение: браузер не может надёжно читать чужие редиректы из-за CORS. Зашифрованные токены и рекламные задания нельзя раскрыть простым декодированием. Инструмент показывает только открытые URL, которые уже содержатся в параметрах.</div></section>
+<section class="features"><div class="feature"><b>Анализ параметров</b><span>Ищет URL в открытом виде и после декодирования.</span></div><div class="feature"><b>Распознавание домена</b><span>LootLabs, Platoboost и Platorelay.</span></div><div class="feature"><b>Локальная обработка</b><span>Адрес не отправляется на наш сервер.</span></div></section>
 <footer>Link Inspector · GitHub Pages · Неофициальный инструмент</footer></main>
 <script>
 const input=document.querySelector('#url'), result=document.querySelector('#result');
-function inspect(){let raw=input.value.trim();result.className='result show';if(!raw){result.innerHTML='<strong>Введи ссылку</strong><p>Нужен полный адрес, начинающийся с https://</p>';return}
-let u;try{u=new URL(raw)}catch{result.innerHTML='<strong>Некорректный адрес</strong><p>Проверь, что ссылка полная и написана правильно.</p>';return}
-if(!['https:','http:'].includes(u.protocol)){result.innerHTML='<strong>Неподдерживаемый протокол</strong><p>Разрешены только HTTP и HTTPS ссылки.</p>';return}
-if(u.username||u.password){result.innerHTML='<strong>Ссылка отклонена</strong><p>URL содержит данные для входа. Удали их перед проверкой.</p>';return}
-const host=u.hostname.toLowerCase().replace(/\.$/,'');
-const isLoot=host==='lootlabs.gg'||host.endsWith('.lootlabs.gg');
-const isPlato=host==='platorepay.com'||host.endsWith('.platorepay.com')||host==='platorelay.com'||host.endsWith('.platorelay.com')||host==='platoboost.app'||host.endsWith('.platoboost.app');
-let type=isLoot?'LootLabs':isPlato?'Platoboost / Platorelay':'Неизвестная платформа';
-let note=(isLoot||isPlato)?'Домен распознан. Эта проверка не подтверждает безопасность ссылки и не обходит рекламные шаги.':'Домен не совпал с известными доменами LootLabs или Platorepay.';
-result.replaceChildren();const title=document.createElement('strong');title.textContent=type;const p=document.createElement('p');p.textContent=note+'\nДомен: '+host;const actions=document.createElement('div');actions.className='actions';const open=document.createElement('a');open.href=u.href;open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть исходную ссылку';const copy=document.createElement('button');copy.type='button';copy.textContent='Копировать URL';copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u.href);copy.textContent='Скопировано'}catch{copy.textContent='Не удалось скопировать'}});actions.append(open,copy);result.append(title,p,actions)}
-document.querySelector('#check').addEventListener('click',inspect);input.addEventListener('keydown',e=>{if(e.key==='Enter')inspect()});
+const targetKeys=/^(url|target|dest|destination|redirect|redirect_url|return|return_url|continue|link|to|out|r|u)$/i;
+function validHttp(s){try{const u=new URL(s);return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password?u:null}catch{return null}}
+function scanUrl(u, found, depth=0){
+ if(depth>3)return;
+ for(const [key,value] of u.searchParams.entries()){
+   const v=value.trim();
+   const direct=validHttp(v);
+   if(direct){found.push({url:direct.href,source:key||'параметр'});continue}
+   if(v.length<8||v.length>8192)continue;
+   for(const candidate of [v, safeDecode(v), safeBase64(v)]){
+     if(!candidate||candidate===v&&candidate===safeDecode(v))continue;
+     const nested=validHttp(candidate);
+     if(nested){found.push({url:nested.href,source:key||'декодированный параметр'});break}
+     if(candidate.startsWith('http%3A')||candidate.startsWith('https%3A')){const dec=safeDecode(candidate);const nu=validHttp(dec);if(nu){found.push({url:nu.href,source:key||'URL-кодированный параметр'});break}}
+   }
+ }
+}
+function safeDecode(s){try{return decodeURIComponent(s.replace(/\+/g,'%20'))}catch{return ''}}
+function safeBase64(s){try{if(!/^[A-Za-z0-9_+\/-]+={0,2}$/.test(s)||s.length%4===1)return '';let b=s.replace(/-/g,'+').replace(/_/g,'/');b+='='.repeat((4-b.length%4)%4);const raw=atob(b);const bytes=Uint8Array.from(raw,ch=>ch.charCodeAt(0));return new TextDecoder().decode(bytes)}catch{return ''}}
+function addText(parent,tag,text){const el=document.createElement(tag);el.textContent=text;parent.append(el);return el}
+function inspect(){
+ const raw=input.value.trim();result.replaceChildren();result.className='result show';
+ if(!raw){addText(result,'strong','Введи ссылку');addText(result,'p','Нужен полный адрес, начинающийся с https://');return}
+ const u=validHttp(raw);
+ if(!u){addText(result,'strong','Некорректный или небезопасный URL');addText(result,'p','Используй полный HTTP/HTTPS адрес без имени пользователя или пароля.');return}
+ const host=u.hostname.toLowerCase().replace(/\.$/,'');
+ const isLoot=host==='lootlabs.gg'||host.endsWith('.lootlabs.gg');
+ const isPlato=['platorepay.com','platorelay.com','platoboost.app'].some(d=>host===d||host.endsWith('.'+d));
+ addText(result,'strong',isLoot?'LootLabs':isPlato?'Platoboost / Platorelay':'URL анализатор');
+ addText(result,'p','Домен: '+host+' · Параметров URL: '+[...u.searchParams.keys()].length);
+ const found=[];scanUrl(u,found);
+ const unique=[...new Map(found.map(x=>[x.url,x])).values()].filter(x=>x.url!==u.href);
+ if(unique.length){
+   addText(result,'strong','Найдены открытые целевые URL: '+unique.length);
+   unique.forEach(item=>{const wrap=document.createElement('div');wrap.style.cssText='border-top:1px solid #292f40;padding:10px 0;margin-top:8px';addText(wrap,'p','Источник: '+item.source);const a=document.createElement('a');a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=item.url;a.style.cssText='display:block;color:#b9b0ff;overflow-wrap:anywhere;margin-bottom:8px';wrap.append(a);const b=document.createElement('button');b.type='button';b.textContent='Копировать найденный URL';b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(item.url);b.textContent='Скопировано'}catch{addText(wrap,'p','Копирование недоступно — выдели адрес вручную.')}});wrap.append(b);result.append(wrap)});
+ }else{
+   addText(result,'p','Открытый целевой URL в параметрах не найден. Если параметр содержит случайный токен или зашифрованные данные, браузер не сможет восстановить адрес простым декодированием.');
+ }
+ const actions=document.createElement('div');actions.className='actions';actions.style.marginTop='12px';
+ const open=document.createElement('a');open.href=u.href;open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть исходную ссылку';
+ const copy=document.createElement('button');copy.type='button';copy.textContent='Копировать исходный URL';copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u.href);copy.textContent='Скопировано'}catch{copy.textContent='Не удалось скопировать'}});
+ actions.append(open,copy);result.append(actions);
+}
+document.querySelector('#check').addEventListener('click',inspect);
+input.addEventListener('keydown',e=>{if(e.key==='Enter')inspect()});
 </script></body></html>
